@@ -2,8 +2,8 @@
 
 VIN=TX866954012345675
 ICCID=89860012111654035052
-SERVER=139.129.104.81
-PORT=9090
+SERVER=47.94.20.34
+PORT=10110
 
 mkdir -p /home/yaozhong/open-tbox/conf
 mkdir -p /home/yaozhong/open-tbox/log

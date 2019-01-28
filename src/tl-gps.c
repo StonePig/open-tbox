@@ -35,7 +35,7 @@ static gpointer tl_gps_work_thread(gpointer user_data)
     
     while(gps_data->work_flag)
     {
-        if(!open_flag && (rc=gps_open("127.0.0.1", "2947", &gdata))==-1)
+        if(!open_flag && (rc=gps_open("127.0.0.1", "10000", &gdata))==-1)//2947
         {
             g_warning("TLGPS failed to open GPS: %s", gps_errstr(rc));
             g_usleep(2000000UL);
@@ -58,6 +58,8 @@ static gpointer tl_gps_work_thread(gpointer user_data)
             }
             else
             {
+            	g_warning("Tgdata.status =  %d",  gdata.status);
+				
                 if((gdata.status==STATUS_FIX) && (gdata.fix.mode==MODE_2D ||
                     gdata.fix.mode==MODE_3D) && !isnan(gdata.fix.latitude) && 
                     !isnan(gdata.fix.longitude))
@@ -83,7 +85,7 @@ static gpointer tl_gps_work_thread(gpointer user_data)
                     gps_data->latitude = gdata.fix.latitude * 1e6;
                     gps_data->longitude = gdata.fix.longitude * 1e6;
                     
-                    g_debug("Latitude: %lf, longitude: %lf, speed: %lf, "
+                    g_warning("Latitude: %lf, longitude: %lf, speed: %lf, "
                         "timestamp: %lf.", gdata.fix.latitude,
                         gdata.fix.longitude, gdata.fix.speed,
                         gdata.fix.time);
@@ -91,7 +93,7 @@ static gpointer tl_gps_work_thread(gpointer user_data)
                 else
                 {
                     gps_data->state &= ~1;
-                    g_debug("No GPS data available.");
+                    g_warning("No GPS data available.");
                 }
             }
         }

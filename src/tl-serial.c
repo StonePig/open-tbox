@@ -239,7 +239,7 @@ static void tl_serial_data_parse(TLSerialData *serial_data)
     
     if(serial_data->write_data!=NULL &&
         (serial_data->write_data->command+1)/2==(command+1)/2 &&
-        result==0)
+        result==1)
     {
         if(serial_data->write_watch_id==0)
         {
@@ -273,7 +273,7 @@ static void tl_serial_data_parse(TLSerialData *serial_data)
         }
         case 10:
         {
-            if(result==0)
+            if(result==1)
             {
                 g_message("TLSerial STM8 RTC clock sync finished.");
                 serial_data->time_sync_finished = TRUE;
@@ -296,6 +296,25 @@ static void tl_serial_data_parse(TLSerialData *serial_data)
             
             break;
         }
+	// response from uart dev
+        case 0xC4:
+
+            break;
+	//cmd from uart dev	
+        case 0xC5:
+        {
+            gint32 can_addr;
+             if(result==0xFE)
+             {
+                     send_ack2uart(command, TRUE);
+	            memcpy(&can_addr, serial_data->read_buffer + 4, 4);
+	            can_addr = g_ntohl(can_addr);
+	            canTboxProc(can_addr, serial_data->read_buffer + 8);
+	            can_rx_data_check4ecu();
+             }
+            break;
+        }
+
         default:
         {
             break;
@@ -519,7 +538,9 @@ gboolean tl_serial_init(const gchar *port)
     }
     
     signal(SIGPIPE, SIG_IGN);
+	
     fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
+    //fd = open("/dev/ttyUSB5", O_RDWR); // | O_NOCTTY | O_NONBLOCK);
     if(fd<0)
     {
         g_warning("TLSerial cannot open serial port: %s", strerror(errno));
@@ -527,8 +548,8 @@ gboolean tl_serial_init(const gchar *port)
     }
     tcgetattr(fd, &options);
     cfmakeraw(&options);
-    cfsetispeed(&options, B9600);
-    cfsetospeed(&options, B9600);
+    cfsetispeed(&options, B115200);
+    cfsetospeed(&options, B115200);
     options.c_cflag &= ~CSIZE;
     options.c_cflag &= ~PARENB;
     options.c_cflag &= ~PARODD;
@@ -720,3 +741,43 @@ void tl_serial_gravity_threshold_set(guint8 threshold)
     g_tl_serial_data.gravity_threshold = threshold;
     tl_serial_write_data_request(&g_tl_serial_data, 15, &threshold, 1, TRUE);
 }
+
+
+void tl_serial_request_send_one_can_pkg_data(guint32 canAddrID, guint8 *sendData)
+{
+     guint8 buffer[20];
+     guint16 i;
+     guint32 value;
+    if(!g_tl_serial_data.initialized)
+    {
+         return;
+    }
+
+    g_message("canAddrID = %x", canAddrID);
+
+    value = g_htonl(canAddrID);
+    buffer[0] = 0xFE;
+    memcpy(buffer + 1, &value, 4);
+    memcpy(buffer + 5, sendData, 8);
+
+    for(i=0; i< 13; i++)
+    {
+	g_message("%x", buffer[i]);
+    }
+	
+
+    tl_serial_write_data_request(&g_tl_serial_data, 0xC3, buffer, 13, FALSE);
+}
+
+void send_ack2uart(guint8 command ,gboolean is_correct)
+{
+    guint8 respond;
+
+    if(is_correct)
+        respond = 0x01;
+    else
+        respond =0x02;
+    tl_serial_write_data_request(&g_tl_serial_data, command, &respond, 1, FALSE);
+}
+
+

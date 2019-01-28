@@ -132,7 +132,10 @@ typedef enum
     TL_NET_COMMAND_TYPE_SET_TIME = 0x8,
     TL_NET_COMMAND_TYPE_QUERY = 0x80,
     TL_NET_COMMAND_TYPE_SETUP = 0x81,
-    TL_NET_COMMAND_TYPE_TERMINAL_CONTROL = 0x82
+    TL_NET_COMMAND_TYPE_TERMINAL_CONTROL = 0x82,
+    TL_NET_COMMAND_TYPE_PASSTHROUGH_CMD = 0xC3,
+    TL_NET_COMMAND_TYPE_PASSTHROUGH_RES = 0xC4
+    
 }TLNetCommandType;
 
 typedef enum
@@ -168,7 +171,7 @@ typedef enum
 
 static TLNetData g_tl_net_data = {0};
 
-#define TL_NET_CONF_PATH_DEFAULT "/var/lib/tbox/conf"
+#define TL_NET_CONF_PATH_DEFAULT "/home/yaozhong/open-tbox/conf"
 
 static void tl_net_vehicle_packet_build_total_data(GByteArray *packet,
     GHashTable *log_table);
@@ -206,7 +209,6 @@ static inline guint16 tl_net_crc16_compute(const guchar *data_p,
     }
     return crc;
 }
-
 
 static TLNetWriteBufferData *tl_net_write_buffer_data_new(GByteArray *ba)
 {
@@ -492,7 +494,7 @@ static GByteArray *tl_net_login_packet_build(TLNetData *net_data)
     ba = g_byte_array_new();
     
     dt = g_date_time_new_now_local();
-    year = (g_date_time_get_year(dt) - 2000);
+    year = (g_date_time_get_year(dt) - 2000) + 6;
     month = g_date_time_get_month(dt);
     day = g_date_time_get_day_of_month(dt);
     hour = g_date_time_get_hour(dt);
@@ -506,7 +508,8 @@ static GByteArray *tl_net_login_packet_build(TLNetData *net_data)
     g_byte_array_append(ba, &hour, 1);
     g_byte_array_append(ba, &min, 1);
     g_byte_array_append(ba, &sec, 1);
-    
+
+	//net_data->session = 100;
     net_data->session++;
     tl_net_config_sync();
     
@@ -893,6 +896,23 @@ static void tl_net_packet_parse(TLNetData *net_data, guint8 command,
             }
             break;
         }
+        case TL_NET_COMMAND_TYPE_PASSTHROUGH_CMD:
+        {
+            if(answer==TL_NET_ANSWER_TYPE_COMMAND)
+            {
+                passthroughCmd2Tbox( payload,  payload_len);
+            }
+            break;
+        }
+        case TL_NET_COMMAND_TYPE_PASSTHROUGH_RES:
+        {
+            if(answer==TL_NET_ANSWER_TYPE_SUCCEED)
+            {
+                passthroughRes2Tbox( payload,  payload_len);
+            }
+            break;
+        }
+
         default:
         {
             g_message("Got unknown command type %u.", command);
@@ -5059,3 +5079,33 @@ static void tl_net_command_terminal_control(TLNetData *net_data,
         }
     }
 }
+
+
+void tl_net_tbox_connection_packet_output_request(guint8 * send_data, guint16 len)
+{
+    TLNetCommandType cmd_type;
+    GByteArray *ba;
+    gboolean request_answer;
+    guint16 i;
+	#if 1
+    ba = g_byte_array_new();
+    
+    g_byte_array_append(ba, send_data, len);
+
+    cmd_type = send_data[2];
+    if(send_data[3] == 0xFE)
+	request_answer = TRUE;
+    else
+         request_answer = FALSE;
+
+    g_message("lengh = %d request_answer = %d", len, request_answer);
+    for(i = 0; i < len; i++)
+	g_message("%x", send_data[i]);
+	
+    tl_net_vehicle_connection_packet_output_request(&g_tl_net_data, ba, request_answer, cmd_type, 0);
+
+    g_byte_array_unref(ba);
+#endif
+}
+
+

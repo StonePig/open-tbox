@@ -11,7 +11,7 @@
 #include <sys/statvfs.h>
 #include "tl-logger.h"
 
-#define TL_LOGGER_STORAGE_BASE_PATH_DEFAULT "/var/lib/tbox/log"
+#define TL_LOGGER_STORAGE_BASE_PATH_DEFAULT "/home/yaozhong/open-tbox/log"
 
 #define TL_LOGGER_LOG_ITEM_HEAD_MAGIC ((const guint8 *)"TLIH")
 #define TL_LOGGER_LOG_ITEM_TAIL_MAGIC ((const guint8 *)"TLIT")
@@ -335,7 +335,7 @@ static gboolean tl_logger_log_query_from_cache(TLLoggerData *logger_data,
             continue;
         }
         
-        log_item_data = g_hash_table_lookup(log_data, "time");
+        log_item_data = (TLLoggerLogItemData *)g_hash_table_lookup(log_data, "time");
         if(log_item_data==NULL)
         {
             continue;
@@ -1295,7 +1295,7 @@ gboolean tl_logger_init(const gchar *storage_base_path)
     log_dir = g_dir_open(g_tl_logger_data.storage_base_path, 0, &error);
     if(error!=NULL)
     {
-        g_warning("TLLogger cannot open log storage directionary: %s",
+        g_warning("TLLogger cannot open log storage directionary___: %s",
             error->message);
         g_free(g_tl_logger_data.storage_base_path);
         g_tl_logger_data.storage_base_path = NULL;

@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        conf_file_path = "/var/lib/tbox/conf";
+        conf_file_path = "/home/yaozhong/open-tbox/conf";
     }
     
     if(g_tl_main_cmd_log_storage_path!=NULL)
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        log_file_path = "/var/lib/tbox/log";
+        log_file_path = "/home/yaozhong/open-tbox/log";
     }
     
     if(g_tl_main_cmd_serial_port!=NULL)
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        serial_port = "/dev/ttymxc3";
+        serial_port = "/dev/ttyUSB4";
     }
     
     if(!tl_logger_init(log_file_path))
@@ -202,3 +202,12 @@ void tl_main_shutdown()
     g_main_loop_quit(g_tl_main_loop);
     g_tl_main_cmd_shutdown = TRUE;
 }
+
+
+void get_vin_id(gchar *vin)
+{
+	g_message("get_vin_id = %s", g_tl_main_cmd_vin_code);
+	memcpy(vin, g_tl_main_cmd_vin_code, 17);
+	//return g_tl_main_cmd_vin_code;
+}
+
