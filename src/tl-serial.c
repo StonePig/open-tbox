@@ -10,6 +10,9 @@
 #include "tl-serial.h"
 #include "tl-main.h"
 
+#include "ql_oe.h"
+
+
 #define TL_SERIAL_WRITE_RETRY_MAXIUM 3
 #define TL_SERIAL_READ_BUFFER_SIZE 512
 
@@ -182,7 +185,8 @@ static void tl_serial_write_data_request(TLSerialData *serial_data,
     guint8 checksum = 0;
     guint8 ack = need_ack ? 1 : 0;
     guint i;
-    
+
+    g_message("tl_serial_write_data_request");
     if(serial_data==NULL || !serial_data->initialized)
     {
         return;
@@ -474,9 +478,12 @@ static gboolean tl_serial_check_timeout_cb(gpointer user_data)
         if(now - serial_data->write_data->timestamp >
             (gint64)TL_SERIAL_RETRY_TIMEOUT * 1e6)
         {
+	g_message("serial_data->write_data->retry_count %d",
+						serial_data->write_data->retry_count);
+
             if(serial_data->write_data->retry_count==0)
             {
-                g_warning("TLSerial command %u out of retry count!",
+                g_warning("TLSerial command %d out of retry count!",
                     serial_data->write_data->command);
                 tl_serial_write_data_free(serial_data->write_data);
                 serial_data->write_data = NULL;    
@@ -494,6 +501,7 @@ static gboolean tl_serial_check_timeout_cb(gpointer user_data)
     if(serial_data->write_watch_id==0 && serial_data->write_data==NULL &&
         !g_queue_is_empty(serial_data->write_queue))
     {
+    	g_message("g_queue_is_not empty");
         serial_data->write_watch_id = g_io_add_watch(
             serial_data->channel, G_IO_OUT,
             tl_serial_write_io_watch_cb, serial_data);
@@ -535,6 +543,7 @@ static gboolean tl_serial_check_timeout_cb(gpointer user_data)
 gboolean tl_serial_init(const gchar *port)
 {
     int fd;
+    int iRet;
     GIOChannel *channel;
     struct termios options;
     
@@ -545,7 +554,7 @@ gboolean tl_serial_init(const gchar *port)
     }
     
     signal(SIGPIPE, SIG_IGN);
-	
+#if 0	
     fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
     //fd = open("/dev/ttyUSB5", O_RDWR); // | O_NOCTTY | O_NONBLOCK);
     if(fd<0)
@@ -572,7 +581,29 @@ gboolean tl_serial_init(const gchar *port)
     options.c_cc[VTIME] = 0;
     tcflush(fd, TCIOFLUSH);
     tcsetattr(fd, TCSANOW, &options);
-    
+ #endif
+
+	 fd = Ql_UART_Open(port, B_115200, FC_NONE);
+	 printf("< open(\"%s\", %d)=%d\n", port, B_115200, fd);
+	 
+	 
+	 /* Start: If need, to modify uart dcb config */
+	 ST_UARTDCB dcb = {
+		.baudrate = B_115200,	 //baudrate: 115200
+		.databit = DB_CS8,  //databit: 8
+		.stopbit = SB_1,	 //stopbit: 1
+		.parity = PB_NONE,  //parity check: none
+		.flowctrl = FC_NONE	 //none flow control
+	 };
+	 
+	 iRet = Ql_UART_SetDCB(fd, &dcb);
+	 printf("SET DCB ret: %d\n", iRet);
+	 iRet = Ql_UART_GetDCB(fd, &dcb);
+	 printf("GET DCB ret: %d: baudrate: %d, flowctrl: %d, databit: %d, stopbit: %d, paritybit: %d\n", 
+				 iRet, dcb.baudrate, dcb.flowctrl, dcb.databit, dcb.stopbit, dcb.parity);
+	 /* End: if need, to modify uart dcb config */
+	 
+
     channel = g_io_channel_unix_new(fd);
     if(channel==NULL)
     {
@@ -773,7 +804,7 @@ void tl_serial_request_send_one_can_pkg_data(guint32 canAddrID, guint8 *sendData
     }
 	
 
-    tl_serial_write_data_request(&g_tl_serial_data, 0xC3, buffer, 13, FALSE);
+    tl_serial_write_data_request(&g_tl_serial_data, 0xC3, buffer, 13, TRUE);
 }
 
 void send_ack2uart(guint8 command ,gboolean is_correct)
