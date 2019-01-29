@@ -60,6 +60,13 @@ typedef struct _TLSerialData
 
 static TLSerialData g_tl_serial_data = {0};
 
+void send_ack2uart(guint8 command ,gboolean is_correct);
+extern gboolean canTboxProc(guint32 id, guint8 *data);
+extern void can_rx_data_check4ecu(void);
+
+
+
+
 static void tl_serial_write_data_free(TLSerialWriteData *data)
 {
     if(data==NULL)

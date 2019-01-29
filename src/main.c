@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <glib.h>
+#include <string.h>
+#include <stdio.h>
 
 #include "tl-main.h"
 #include "tl-logger.h"

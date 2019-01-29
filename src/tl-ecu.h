@@ -63,7 +63,7 @@ typedef char S8;
 
 
 #ifndef U16
-typedef unsigned char U16;
+typedef unsigned short U16;
 #endif
 
 
@@ -105,6 +105,10 @@ typedef unsigned int U32;
 #define RS_SYSTEM_BUSY                      6   // 系统正忙
 #define RS_IMEI_NOT_WRITTEN					7	// IMEI not written
 #define RS_ERR_INVALID_PARAM                9  // 无效参数
+
+//#define DL_IMG_FILE_NAME 	L"C:\\dl_img.dat"
+#define DL_IMG_FILE_NAME 	"dl_img.dat"
+
 
 
 #define SPEC_CHAR 0x23 

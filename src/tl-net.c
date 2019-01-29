@@ -195,6 +195,11 @@ static void tl_net_command_vehicle_setup(TLNetData *net_data,
 static void tl_net_command_terminal_control(TLNetData *net_data,
     const guint8 *payload, guint payload_len);
 
+
+extern void passthroughCmd2Tbox(guint8* rest_buf, guint32 length);
+extern void passthroughRes2Tbox(guint8* rest_buf, guint32 length);
+
+
 static inline guint16 tl_net_crc16_compute(const guchar *data_p,
     gsize length)
 {
@@ -5081,7 +5086,7 @@ static void tl_net_command_terminal_control(TLNetData *net_data,
 }
 
 
-void tl_net_tbox_connection_packet_output_request(guint8 * send_data, guint16 len)
+void tl_net_tbox_connection_packet_output_request(gchar * send_data, guint16 len)
 {
     TLNetCommandType cmd_type;
     GByteArray *ba;

@@ -1,11 +1,14 @@
 #include <glib/gstdio.h>
+#include <string.h>
+#include <stdio.h>
+
 
 #include "tl-ecu.h"
 #include "tl-net.h"
 
 
 void Bird_soc_sendbufAdd2(Send_Info *_sendinfo);
-//extern U8 *get_vin_id(void);
+
 U8 get_encryption();
 void tbox_delay_reset();
 void sendOnePkgData2CAN(U32 canAddrID, U8 *sendData);	
@@ -60,6 +63,9 @@ static kal_bool sendData2Dev(passthrough_data_struct pst, kal_bool isCmd);
 
 void devConnectHeart(void);
 
+extern void tl_net_tbox_connection_packet_output_request(S8 * send_data, U16 len);
+extern void tl_serial_request_send_one_can_pkg_data(U32 canAddrID, U8 *sendData);
+extern void get_vin_id(S8 *vin);
 
 
 #define kal_prompt_trace	PRINTF
@@ -573,13 +579,13 @@ void tbox_upgrade_sw_res(U8* rest_buf, U32 length)
 				sendACKToServer(MSG_CODE_TBOX_PACKAGE_HEAD_CMD,KAL_FALSE);
 				break;
 			}
-			downloadStatus = MSG_CODE_TBOX_PACKAGE_HEAD_CMD;
+			cmdType = MSG_CODE_TBOX_PACKAGE_HEAD_CMD;
 			//send correct ack
 			sendACKToServer(MSG_CODE_TBOX_PACKAGE_HEAD_CMD,KAL_TRUE);
 			break;
 			
 		case MSG_CODE_TBOX_PACKAGE_DATA_CMD:
-			if(downloadStatus != MSG_CODE_TBOX_PACKAGE_HEAD_CMD && downloadStatus != MSG_CODE_TBOX_PACKAGE_DATA_CMD)
+			if(cmdType != MSG_CODE_TBOX_PACKAGE_HEAD_CMD && cmdType != MSG_CODE_TBOX_PACKAGE_DATA_CMD)
 			{
 				kal_prompt_trace(MOD_FOTA,"tbox_upgrade_sw_res downloadStatus error when recieve MSG_CODE_TBOX_PACKAGE_DATA_CMD");
 				//send error ack
@@ -606,7 +612,7 @@ void tbox_upgrade_sw_res(U8* rest_buf, U32 length)
 				sendACKToServer(MSG_CODE_TBOX_PACKAGE_DATA_CMD,KAL_FALSE);
 				break;
 			}				
-			downloadStatus = MSG_CODE_TBOX_PACKAGE_DATA_CMD;
+			cmdType = MSG_CODE_TBOX_PACKAGE_DATA_CMD;
 			//send correct ack
 			sendACKToServer(MSG_CODE_TBOX_PACKAGE_DATA_CMD,KAL_TRUE);
 			break;
@@ -742,9 +748,9 @@ static kal_bool sendACKToServer(MSG_CODE_ENUM msg, kal_bool isACKCorrect)
 		if(dataSend2Cloud[0] == CMD_DEV_INFO) // 获取设备ID
 		{
 			curComParm.devId = devID;
-			strbegin = strstr(&dataSend2Cloud[3], "/") + 1;
-			strbegin = strstr(strbegin, "/") + 1;
-			strend = strstr(strbegin, "/");
+			strbegin = strstr((S8 *)dataSend2Cloud + 3, (S8 *)"/") + 1;
+			strbegin = strstr((S8 *)strbegin, (S8 *)"/") + 1;
+			strend = strstr((S8 *)strbegin, (S8 *)"/");
 			curComParm.devIdLenth = strend - strbegin;
 			if(curComParm.devIdLenth < 100)
 				memcpy(curComParm.devId, strbegin, curComParm.devIdLenth);
@@ -863,11 +869,11 @@ static kal_bool savePkgData(pkg_data_struct pkg)
 	}
 #endif	
 	if(pkg.curPkgNum == 0)
-		FS_Delete(L"C:\\dl_img.dat");
+		FS_Delete(DL_IMG_FILE_NAME);
 	
 	//保存到文件系统中
 	//fileHandle = FS_Open(L"C:\\dl_img.dat",FS_CREATE|FS_READ_WRITE);
-	fileHandle = FS_Open(L"C:\\dl_img.dat",FS_READ_WRITE);
+	fileHandle = FS_Open(DL_IMG_FILE_NAME, FS_READ_WRITE);
 	if (fileHandle == NULL)
     {
 		kal_prompt_trace(MOD_FOTA,"savePkgData error fileHandle = %d" , fileHandle);
@@ -886,7 +892,7 @@ static kal_bool savePkgData(pkg_data_struct pkg)
 	{
 		kal_prompt_trace(MOD_FOTA,"savePkgData is the last pkg");
 		//检查checksum
-		fileHandle = FS_Open(L"C:\\dl_img.dat",FS_READ_ONLY);
+		fileHandle = FS_Open(DL_IMG_FILE_NAME, FS_READ_ONLY);
 		if (fileHandle == NULL)
 	    {
 			kal_prompt_trace(MOD_FOTA,"savePkgData error fileHandle = %d" , fileHandle);
@@ -1077,7 +1083,7 @@ void SaveToFlashTimerProc(void)
 
 	//StopTimer(BIRD_COUNTOR_TIMEOUT_TIMER);
 
-	fileHandle = FS_Open(L"C:\\dl_img.dat",FS_READ_ONLY);
+	fileHandle = FS_Open(DL_IMG_FILE_NAME, FS_READ_ONLY);
 	if (fileHandle ==NULL)
     {
     	curPageNum = 0;
