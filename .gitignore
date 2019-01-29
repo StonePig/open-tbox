@@ -1,6 +1,8 @@
 *.o
 *.lo
 *.d
+*.tlz
+*.tlw
 configure
 /Makefile
 src/.deps
@@ -20,3 +22,4 @@ src/.deps
 /libtool
 /config.status
 /config.h
+log

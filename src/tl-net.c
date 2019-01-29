@@ -112,12 +112,13 @@ typedef struct _TLNetBacklogData
 
 typedef enum
 {
-    TL_NET_CONNECTION_STATE_IDLE = 0,
-    TL_NET_CONNECTION_STATE_CONNECTING = 1,
-    TL_NET_CONNECTION_STATE_CONNECTED = 2,
-    TL_NET_CONNECTION_STATE_LOGINING = 3,
-    TL_NET_CONNECTION_STATE_LOGINED = 4,
-    TL_NET_CONNECTION_STATE_ANSWER_PENDING = 5
+    TL_NET_CONNECTION_STATE_NONE = 0,
+    TL_NET_CONNECTION_STATE_IDLE = 1,
+    TL_NET_CONNECTION_STATE_CONNECTING = 2,
+    TL_NET_CONNECTION_STATE_CONNECTED = 3,
+    TL_NET_CONNECTION_STATE_LOGINING = 4,
+    TL_NET_CONNECTION_STATE_LOGINED = 5,
+    TL_NET_CONNECTION_STATE_ANSWER_PENDING = 6
 }TLNetConnectionState;
 
 typedef enum
@@ -199,6 +200,100 @@ static void tl_net_command_terminal_control(TLNetData *net_data,
 extern void passthroughCmd2Tbox(guint8* rest_buf, guint32 length);
 extern void passthroughRes2Tbox(guint8* rest_buf, guint32 length);
 
+#ifdef AG35_PROJECT	
+
+#include <arpa/inet.h>
+#include <getopt.h>
+#include <unistd.h>
+#include "ql_wwan_v2.h"
+
+
+static void data_call_state_callback(ql_data_call_state_s *state)
+{
+	g_message("profile id %d ", state->profile_idx);
+	g_message("IP family %s ", QL_DATA_CALL_TYPE_IPV4 == state->ip_family ? "v4" : "v6");
+	if(QL_DATA_CALL_CONNECTED == state->state) {
+		g_tl_net_data.vehicle_connection_state = TL_NET_CONNECTION_STATE_IDLE;
+		g_message("is Connected\n");
+		g_message("Interface Name: %s\n", state->name);
+		if(QL_DATA_CALL_TYPE_IPV4 == state->ip_family) {
+			g_message("IP address:          %s\n", inet_ntoa(state->v4.ip));
+			g_message("Gateway address:     %s\n", inet_ntoa(state->v4.gateway));
+			g_message("Primary DNS address: %s\n", inet_ntoa(state->v4.pri_dns));
+			g_message("Second DNS address:  %s\n", inet_ntoa(state->v4.sec_dns));
+		} else {
+			char ipv6_buffer[INET6_ADDRSTRLEN];
+			inet_ntop(AF_INET6, (void *)&state->v6.ip, ipv6_buffer, INET6_ADDRSTRLEN);
+			g_message("IP address:          %s\n", ipv6_buffer);
+			inet_ntop(AF_INET6, (void *)&state->v6.gateway, ipv6_buffer, INET6_ADDRSTRLEN);
+			g_message("Gateway address:     %s\n", ipv6_buffer);
+			inet_ntop(AF_INET6, (void *)&state->v6.pri_dns, ipv6_buffer, INET6_ADDRSTRLEN);
+			g_message("Primary DNS address: %s\n", ipv6_buffer);
+			inet_ntop(AF_INET6, (void *)&state->v6.sec_dns, ipv6_buffer, INET6_ADDRSTRLEN);
+			g_message("Second DNS address:  %s\n", ipv6_buffer);
+		}
+		g_message("\n");
+	} else {
+		g_message("is disconnected, and reason code 0x%x\n", state->err);
+	}
+}
+
+
+gboolean data_dail_start(void)
+{
+	int retry = 10;
+	int loop;
+	ql_data_call_s data_call[3];
+	ql_data_call_info_s data_call_info;
+	ql_data_call_error_e err = QL_DATA_CALL_ERROR_NONE;
+
+	memset(&data_call, 0, sizeof(data_call));
+
+	
+	if(QL_Data_Call_Init(data_call_state_callback)) 
+	{
+		g_message("Initialization data call failure\n");
+		return FALSE;
+	}
+	for(loop = 0; loop < sizeof(data_call)/sizeof(data_call[0]); loop++) 
+	{
+		memset(&data_call_info, 0, sizeof(data_call_info));
+		err = QL_DATA_CALL_ERROR_NONE;
+		data_call[loop].profile_idx = loop+1;
+		/*
+		* If your data call program is coredump, the data call status will not disappear automatically. 
+		* When your program is start again, you need to call the QL_Data_Call_Info_Get interface to get 
+		* the data call status. Because it is already in the data call state, you call QL_Data_Call_Start 
+		* again without callback function
+		*/
+		if(QL_Data_Call_Info_Get(data_call[loop].profile_idx, QL_DATA_CALL_TYPE_IPV4, &data_call_info, &err))
+		{
+			g_message("get profile index %d information failure: errno 0x%x\n", data_call[loop].profile_idx, err);
+			continue;
+		}
+		if(QL_DATA_CALL_CONNECTED == data_call_info.v4.state) 
+		{
+			g_message("the profile index %d is already connected, don't up\n", data_call[loop].profile_idx);
+			continue;
+		}
+		data_call[loop].ip_family = QL_DATA_CALL_TYPE_IPV4;
+		data_call[loop].reconnect = true;
+		err = QL_DATA_CALL_ERROR_NONE;
+		if(QL_Data_Call_Start(&data_call[loop], &err))
+		{
+			g_message("the profile index %d start data call failure: 0x%x\n", data_call[loop].profile_idx, err);
+		}
+		else
+		{
+			g_tl_net_data.vehicle_connection_state = TL_NET_CONNECTION_STATE_IDLE;
+			g_message("the profile index %d start data call success\n", data_call[loop].profile_idx);
+			return TRUE;
+		}
+		usleep(500*1000);
+	}
+	return FALSE;
+}
+#endif
 
 static inline guint16 tl_net_crc16_compute(const guchar *data_p,
     gsize length)
@@ -1360,12 +1455,20 @@ static gboolean tl_net_vehicle_connection_check_timeout_cb(gpointer user_data)
     
             net_data->vehicle_connection_state =
                 TL_NET_CONNECTION_STATE_CONNECTING;
+	
             g_socket_client_connect_to_host_async(net_data->vehicle_client,
                 server_host, 0, NULL, tl_net_vehicle_connect_host_async_cb,
                 net_data);
             
             break;
         }
+        case TL_NET_CONNECTION_STATE_NONE:
+#ifdef AG35_PROJECT	
+            data_dail_start();
+#else
+            net_data->vehicle_connection_state = TL_NET_CONNECTION_STATE_IDLE;
+#endif
+            break;
         default:
         {
             break;
