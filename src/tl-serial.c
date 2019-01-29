@@ -10,7 +10,9 @@
 #include "tl-serial.h"
 #include "tl-main.h"
 
+#ifdef AG35_PROJECT
 #include "ql_oe.h"
+#endif
 
 
 #define TL_SERIAL_WRITE_RETRY_MAXIUM 3
@@ -554,7 +556,7 @@ gboolean tl_serial_init(const gchar *port)
     }
     
     signal(SIGPIPE, SIG_IGN);
-#if 0	
+#ifndef AG35_PROJECT	
     fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
     //fd = open("/dev/ttyUSB5", O_RDWR); // | O_NOCTTY | O_NONBLOCK);
     if(fd<0)
@@ -581,7 +583,8 @@ gboolean tl_serial_init(const gchar *port)
     options.c_cc[VTIME] = 0;
     tcflush(fd, TCIOFLUSH);
     tcsetattr(fd, TCSANOW, &options);
- #endif
+#else
+
 
 	 fd = Ql_UART_Open(port, B_115200, FC_NONE);
 	 printf("< open(\"%s\", %d)=%d\n", port, B_115200, fd);
@@ -603,6 +606,7 @@ gboolean tl_serial_init(const gchar *port)
 				 iRet, dcb.baudrate, dcb.flowctrl, dcb.databit, dcb.stopbit, dcb.parity);
 	 /* End: if need, to modify uart dcb config */
 	 
+#endif
 
     channel = g_io_channel_unix_new(fd);
     if(channel==NULL)
